@@ -1,0 +1,365 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Работа с БД</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .form{
+            margin-bottom:10px;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        button {
+            padding: 6px 12px;
+            background-color: #4CAF50;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+        }
+
+        input[type="text"], input[type="number"], select {
+            width: 100%;
+            padding: 6px 8px;
+            margin: 8px 0;
+            display: inline-block;
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Список людей</h1>
+        <form class="form">
+            <label for="name">Имя:</label>
+            <input type="text" id="name">
+            <br>
+            <label for="age">Возраст:</label>
+            <input type="number" id="age">
+            <br>
+            <div>
+                <label for="role">Введите роль:</label>
+                <input type="text" id="role" />
+            </div>
+            <div>
+                <label for="team">Введите команду:</label>
+                <input type="text" id="team" />
+            </div>
+            <br>
+            <button id="add-person">Добавить</button>
+        </form>
+        <div>
+            <label for="filter-name">Фильтр по имени:</label>
+            <input type="text" id="filter-name">
+        </div>
+        <div>
+            <label for="filter-role">Фильтр по роли:</label>
+            <input type="text" id="filter-role">
+        </div>
+        <button id="apply-filter">Применить фильтр</button>
+        <button id="clear-filter">Отменить фильтр</button>
+
+        <table id="persons-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Имя</th>
+                    <th>Возраст</th>
+                    <th>Роль</th>
+                    <th>Команда</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+        <div id="edit-person-form" style="display: none;">
+            <h2>Редактировать данные</h2>
+            <label for="edit-name">Имя:</label>
+            <input type="text" id="edit-name">
+            <br>
+            <label for="edit-age">Возраст:</label>
+            <input type="number" id="edit-age">
+            <br>
+            <label for="edit-role">Роль:</label>
+            <input type="text" id="edit-role" />
+            <br>
+            <label for="edit-team">Команда:</label>
+            <input type="text" id="edit-team" />
+            <br>
+            <button id="edit-person">Сохранить изменения</button>
+            <button id="close-edit-form">Отмена</button>
+        </div>
+        <button id="logout">Выйти</button>
+    </div>
+    <script async>
+        let personsList = [];
+        function clearFilter() {
+            document.querySelector("#filter-name").value = "";
+            document.querySelector("#filter-role").value = "";
+            applyFilter();
+        }
+
+        document.querySelector("#clear-filter").addEventListener("click", clearFilter);
+
+
+        async function applyFilter() {
+            const filterByName = document.querySelector("#filter-name").value;
+            const filterByRole = document.querySelector("#filter-role").value;
+            let filteredPersons = personsList;
+
+            if (filterByName) {
+                filteredPersons = filteredPersons.filter(person => person.name.toLowerCase().includes(filterByName.toLowerCase()));
+            }
+
+            if (filterByRole) {
+                filteredPersons = filteredPersons.filter(person => person.role.name.toLowerCase().includes(filterByRole.toLowerCase()));
+            }
+
+            renderTable(filteredPersons);
+        }
+
+        async function refreshPersonData() {
+            const persons = await fetchPersons();
+            personsList = persons;
+            applyFilter();
+        }
+       
+
+        document.querySelector("#apply-filter").addEventListener("click", applyFilter);
+
+        const userId = parseInt(localStorage.getItem("userId"), 10);
+
+        if (isNaN(userId)) {
+            window.location.href = "login.html";
+        }
+
+        const baseUrl = `https://localhost:7169/api/persons/${userId}`;
+
+
+        async function fetchPersons() {
+            const response = await fetch(baseUrl);
+            return response.json();
+        }
+
+        async function addPerson(personData) {
+            const response = await fetch(baseUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    name: personData.name,
+                    age: personData.age,
+                    role: { name: personData.role.name },
+                    team: { name: personData.team.name }
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error("Failed to add person");
+            }
+        }
+
+
+
+
+        async function deletePerson(id) {
+            const response = await fetch(`${baseUrl}/${id}`, {
+                method: "DELETE"
+            });
+
+            if (!response.ok) {
+                throw new Error("Ошибка удаления");
+            }
+        } async function updatePerson(personId, updatedPersonData) {
+            try {
+                const response = await fetch(`${baseUrl}/${personId}`, {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        ...updatedPersonData,
+                        role: { name: updatedPersonData.role.name },
+                        team: { name: updatedPersonData.team.name }
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error("Ошибка обновления");
+                }
+
+                return response.json();
+            } catch (err) {
+                console.error(err);
+                throw err;
+            }
+        }
+
+
+
+
+        function renderTable(persons) {
+            const tbody = document.querySelector("#persons-table tbody");
+
+            tbody.innerHTML = '';
+
+            for (const person of persons) {
+                const row = document.createElement("tr");
+                row.innerHTML = `
+            <td>${person.id}</td>
+            <td>${person.name}</td>
+            <td>${person.age}</td>
+            <td>${person.role.name}</td>
+            <td>${person.team.name}</td>
+            <td>
+                <button onclick="handleDeleteButtonClick(${person.id})">Удалить</button>
+                <button class="edit-btn" data-person-id="${person.id}">Редактировать</button>
+            </td>
+        `;
+
+                const editButton = row.querySelector(".edit-btn");
+                editButton.addEventListener("click", () => openEditForm(person.id));
+
+                tbody.appendChild(row);
+            }
+        }
+
+        let editingPersonId = null;
+
+        async function openEditForm(personId) {
+            editingPersonId = personId;
+            const response = await fetch(`${baseUrl}/${editingPersonId}`);
+            const personData = await response.json();
+
+            document.querySelector("#edit-person-form").style.display = "block";
+            document.querySelector("#edit-name").value = personData.name;
+            document.querySelector("#edit-age").value = personData.age;
+            document.querySelector("#edit-role").value = personData.role.name;
+            document.querySelector("#edit-team").value = personData.team.name;
+        }
+
+
+
+        document.querySelector("#add-person").addEventListener("click", async (event) => {
+            event.preventDefault();
+
+            const name = document.querySelector("#name").value;
+            const age = document.querySelector("#age").value;
+            const roleName = document.querySelector("#role").value;
+            const teamName = document.querySelector("#team").value;
+            if (!name || !age || !roleName || !teamName) {
+                alert("Поля 'Имя', 'Возраст', 'Роль' и 'Команда' должны быть заполнены");
+                return;
+            }
+
+            const newPerson = {
+                name: name,
+                age: age,
+                role: { name: roleName },
+                team: { name: teamName }
+            };
+
+            try {
+        await addPerson(newPerson);
+        const persons = await fetchPersons();
+        renderTable(persons);
+    } catch (err) {
+        alert(err.message);
+    }
+        });
+
+
+        async function handleDeleteButtonClick(id) {
+            try {
+                await deletePerson(id);
+                const persons = await fetchPersons();
+                renderTable(persons);
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+        document.querySelector("#edit-person").addEventListener("click", async (event) => {
+            event.preventDefault();
+
+            if (!editingPersonId) return;
+
+            const roleName = document.querySelector("#edit-role").value;
+            const teamName = document.querySelector("#edit-team").value;
+
+            if (!roleName || !teamName) {
+                alert("Выберите роль и команду");
+                return;
+            }
+
+            const updatedPerson = {
+                name: document.querySelector("#edit-name").value,
+                age: document.querySelector("#edit-age").value,
+                role: { name: roleName },
+                team: { name: teamName }
+            };
+
+            try {
+                const updatedPersonResult = await updatePerson(editingPersonId, updatedPerson);
+                personsList = personsList.map((person) =>
+                    person.id === updatedPersonResult.id ? updatedPersonResult : person
+                );
+
+                document.querySelector("#edit-person-form").style.display = "none";
+                renderTable(personsList); // Переместите вызов сюда
+
+            } catch (err) {
+                console.log(err.message);
+                return;
+            }
+        });
+
+
+
+        document.querySelector("#logout").addEventListener("click", () => {
+            localStorage.removeItem("userId");
+            window.location.href = "login";
+        });
+
+        document.querySelector("#close-edit-form").addEventListener("click", () => {
+            document.querySelector("#edit-person-form").style.display = "none";
+        });
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            await refreshPersonData();
+            const persons = await fetchPersons(); personsList = persons;
+            renderTable(persons);
+            
+        });
+       
+    </script>
+</body>
+</html>
